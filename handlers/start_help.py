@@ -27,8 +27,9 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     /start - Запустить бота
     /help - Помощь и инструкции
     /translate - Начать перевод
+    /status - Статус использования
     
-    Просто отправь текст, чтобы получить перевод!
+    Просто отправь текст, чтобы получить перевод! (Доступно 20 в день)
     """
     
     # Отправляем сообщение пользователю
@@ -46,6 +47,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         /translate - Начать перевод текста
         /languages - Показать список языков
         /cancel - Отменить текущий перевод
+        /status - Узнать лимит переводов (доступно 20 в день)
 
         Использование:
 
