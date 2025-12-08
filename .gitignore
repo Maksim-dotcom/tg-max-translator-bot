@@ -1,4 +1,24 @@
+# Виртуальное окружение
 venv/
 .env
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Файлы IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.temp
+
+# Файлы окружения
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
