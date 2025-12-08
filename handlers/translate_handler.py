@@ -80,11 +80,15 @@ async def process_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     target_lang = context.user_data.get("target_lang", "ru")
     lang_name = context.user_data.get("lang_name", "Русский")
+    user_id = update.effective_user.id
     
     print(f"Перевод текста: '{user_text[:50]}...' на {target_lang}")
     
     # Типо печатает
     await update.message.chat.send_action(action="typing")
+
+    #Передача user_id при вызове translate
+    translated = translator.translate(user_text, target_lang=target_lang, user_id=user_id)
     
     # Перевод
     translated = translator.translate(user_text, target_lang=target_lang)
@@ -116,6 +120,7 @@ async def cancel_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def quick_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Перевод на русский без определения языка"""
     user_text = update.message.text
+    user_id = update.effective_user.id
     
     # Пропуска команд
     if user_text.startswith('/'):
@@ -124,6 +129,9 @@ async def quick_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"Быстрый перевод: '{user_text[:50]}...'")
     
     await update.message.chat.send_action(action="typing")
+
+    #Передача user_id при вызове translate
+    translated = translator.translate(user_text, target_lang="ru", user_id=user_id)
     
     # Перевод на русский
     translated = translator.translate(user_text, target_lang="ru")
