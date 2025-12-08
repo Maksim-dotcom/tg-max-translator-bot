@@ -33,22 +33,35 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     # Отправляем сообщение пользователю
     await update.message.reply_text(welcome_text)
-    print(f"✅ Пользователь {user.first_name} запустил бота")
+    print(f"Пользователь {user.first_name} запустил бота")
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Обработчик команды /help для справки по использованию
-    """
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Справка"""
     help_text = """
-    Основные команды:
-    /start - Запустить бота и увидеть приветствие
-    /help - Показать эту справку
-    /translate - Начать процесс перевода
+        Команды бота:
+
+        /start - Начать работу с ботом
+        /help - Показать эту справку
+        /translate - Начать перевод текста
+        /languages - Показать список языков
+        /cancel - Отменить текущий перевод
+
+        Использование:
+
+        1. Для перевода с выбором языка:
+        - Отправьте /translate
+        - Выберите язык из списка
+        - Введите текст для перевода
+
+        2. Для быстрого перевода на русский:
+        - Просто отправьте любой текст
+        - Бот автоматически переведет его
+
+Поддерживаемые языки: русский, английский, испанский, французский, немецкий, итальянский и другие.
     """
     
     await update.message.reply_text(help_text)
-    print(f"✅ Пользователь {update.effective_user.first_name} запросил помощь")
 
 
 # Экспорт функций для использования в других файлах
