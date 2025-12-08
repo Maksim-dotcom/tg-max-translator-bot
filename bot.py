@@ -3,58 +3,73 @@ bot.py - Главный файл Telegram бота
 """
 
 import logging
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
 
-# Импортирn конфигурациb
 from config import BOT_TOKEN
 
 # Импорт обработчиков
 from handlers.start_help import start_command, help_command
 from handlers.common import unknown_command
+from handlers.translate_handler import (
+    start_translate_command, language_selected, process_text,
+    cancel_translate, quick_translate, handle_quick_button,
+    show_languages_command,
+    WAITING_FOR_LANGUAGE, WAITING_FOR_TEXT
+)
 
-# Логирование
+# Красивое логирование
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(__name__)
 
-def main() -> None:
-    """
-    Основная функция запуска
-    """
-    print("🚀 Запуск бота-переводчика...")
+def main():
+    """Запуск бота"""
     
     try:
-        # Объект управления ботом
         application = Application.builder().token(BOT_TOKEN).build()
+        print("Application создан")
         
-        print("✅ Application создан")
-        
-        # Команда /start
-        application.add_handler(CommandHandler("start", start_command))
-        print("✅ Обработчик /start зарегистрирован")
-        
-        # Команда /help
-        application.add_handler(CommandHandler("help", help_command))
-        print("✅ Обработчик /help зарегистрирован")
-        
-        # Обработчик неизвестных команд
-        application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
-        print("✅ Обработчик неизвестных команд зарегистрирован")
-        
-        print("🤖 Бот запущен!")
-        
-        # Проверка наличия новых сообщений, когда бот активен
-        application.run_polling(
-            allowed_updates=["message", "callback_query"],
-            drop_pending_updates=True 
+        # Состояние для перевода
+        translate_handler = ConversationHandler(
+            entry_points=[CommandHandler("translate", start_translate_command)],
+            states={
+                WAITING_FOR_LANGUAGE: [
+                    CallbackQueryHandler(language_selected)
+                ],
+                WAITING_FOR_TEXT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, process_text)
+                ],
+            },
+            fallbacks=[CommandHandler("cancel", cancel_translate)]
         )
         
+        # Регистрация обработчиков
+        
+        # Базовые команды
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("languages", show_languages_command))
+        
+        # Перевод
+        application.add_handler(translate_handler)
+        
+        # Быстрый перевод
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, quick_translate))
+        
+        # Кнопки быстрого перевода
+        application.add_handler(CallbackQueryHandler(handle_quick_button, pattern="^quick_"))
+        
+        # Неизвестные команды
+        application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
+        
+        print("Бот запущен!")
+        
+        # Запуск бота
+        application.run_polling(allowed_updates=["message", "callback_query"])
+        
     except Exception as e:
-        logger.error(f"❌ Ошибка при запуске бота: {e}")
-        print(f"❌ Критическая ошибка: {e}")
+        print(f"Ошибка: {e}")
 
-if __name__ == '__main__':
-    # Запуск только при прямом выполнении файла
+if __name__ == "__main__":
     main()
