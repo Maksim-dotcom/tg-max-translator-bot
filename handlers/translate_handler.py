@@ -15,7 +15,18 @@ async def start_translate_command(update: Update, context: ContextTypes.DEFAULT_
     """Обработчик команды /translate"""
     
     user = update.effective_user
+    user_id = user.id
+
     print(f"Пользователь {user.first_name} начал перевод")
+
+    # Проверка лимита пользователя
+    can_translate, error = translator.can_user_translate(user_id)
+    if not can_translate:
+        await update.message.reply_text(
+            f"Превышен дневной лимит: {error}\n"
+            f"Используйте /status для проверки."
+        )
+        return ConversationHandler.END
     
     # Список языков
     languages = translator.get_languages()
@@ -182,3 +193,39 @@ async def show_languages_command(update: Update, context: ContextTypes.DEFAULT_T
         languages_text += f"{name} ({code})\n"
     
     await update.message.reply_text(languages_text)
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Статус лимита для пользователя"""
+    user_id = update.effective_user.id
+    
+    # Получаем информацию об использовании
+    usage = translator.get_user_usage(user_id)
+    
+    status_text = (
+        f"Ваш статус использования:\n\n"
+        f"Использовано переводов сегодня: {usage['used']} из {usage['limit']}\n"
+        f"Осталось переводов: {usage['remaining']}\n\n"
+        f"Лимит: {usage['limit']} переводов в день\n"
+        f"Максимальная длина текста: 1000 символов"
+    )
+    
+    await update.message.reply_text(status_text)
+
+
+async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сброс счетчика для тестов"""
+    user_id = update.effective_user.id
+    
+    # Сбрасываем счетчик
+    success = translator.reset_user(user_id)
+    
+    if success:
+        await update.message.reply_text(
+            "Ваш счетчик переводов сброшен.\n"
+            "Теперь можно снова использовать переводы."
+        )
+    else:
+        await update.message.reply_text(
+            "У вас еще не было переводов сегодня.\n"
+            "Счетчик уже на нуле."
+        )
