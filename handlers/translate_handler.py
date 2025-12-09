@@ -101,9 +101,6 @@ async def process_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #Передача user_id при вызове translate
     translated = translator.translate(user_text, target_lang=target_lang, user_id=user_id)
     
-    # Перевод
-    translated = translator.translate(user_text, target_lang=target_lang)
-    
     if translated:
         response = (
             f"Перевод на {lang_name}:\n\n"
