@@ -18,24 +18,6 @@ Telegram-бот для перевода текста с использовани
 - Каждый пользователь: 20 переводов в день
 - Максимальная длина текста: 1000 символов
 
-## Структура проекта
-tg-max-translator-bot/
-├── .gitignore
-├── bot.py
-├── config.py
-├── Procfile
-├── requirements.txt
-├── runtime.txt
-├── railway.json
-├── services/
-│ └── yandex_translate.py
-├── handlers/
-│ ├── start_help.py
-│ ├── common.py
-│ └── translate_handler.py
-└── utils/
-
-
 ## Технологии
 
 - Python 3.11+
