@@ -14,7 +14,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     # Сообщение
     welcome_text = f"""
-    Привет, {user.first_name}!
+    Привет!
     
     Я — бот-переводчик Максимус
     
