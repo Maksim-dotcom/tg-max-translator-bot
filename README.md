@@ -74,4 +74,4 @@ pip install -r requirements.txt
 
 ### Демонстрация работы
 
-![Демо GIF](./assets/demo.gif)
+![Демо GIF](./assets/animation.gif)
