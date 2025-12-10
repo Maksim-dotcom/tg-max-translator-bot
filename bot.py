@@ -13,9 +13,10 @@ from handlers.common import unknown_command
 from handlers.translate_handler import (
     start_translate_command, language_selected, process_text,
     cancel_translate, quick_translate, handle_quick_button,
-    show_languages_command, status_command, reset_command,
+    show_languages_command, status_command,
     WAITING_FOR_LANGUAGE, WAITING_FOR_TEXT
 )
+from utils.admin import adduser_command, removeuser_command, listusers_command
 
 # Красивое логирование
 logging.basicConfig(
@@ -51,7 +52,6 @@ def main():
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("languages", show_languages_command))
         application.add_handler(CommandHandler("status", status_command))
-        application.add_handler(CommandHandler("reset", reset_command))
         
         # Перевод
         application.add_handler(translate_handler)
@@ -61,8 +61,13 @@ def main():
         
         # Кнопки быстрого перевода
         application.add_handler(CallbackQueryHandler(handle_quick_button, pattern="^quick_"))
+
+        # Админские команды
+        application.add_handler(CommandHandler("adduser", adduser_command))
+        application.add_handler(CommandHandler("removeuser", removeuser_command))
+        application.add_handler(CommandHandler("listusers", listusers_command))
         
-        # Неизвестные команды
+        # Неизвестные команды ДОЛЖНО БЫТЬ ПОСЛЕДНИМ
         application.add_handler(MessageHandler(filters.COMMAND, unknown_command))
         
         print("Бот запущен!")

@@ -6,6 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 from services.yandex_translate import translator
+from utils.user_check import is_user_allowed
 
 # Состояния для диалога
 WAITING_FOR_LANGUAGE = 1
@@ -13,6 +14,12 @@ WAITING_FOR_TEXT = 2
 
 async def start_translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /translate"""
+
+    user_id = update.effective_user.id
+    
+    if not is_user_allowed(user_id):
+        await update.message.reply_text("У вас недостаточно прав")
+        return
     
     user = update.effective_user
     user_id = user.id
@@ -121,6 +128,12 @@ async def process_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Отмена перевода"""
+    user_id = update.effective_user.id
+
+    if not is_user_allowed(user_id):
+        await update.message.reply_text("У вас недостаточно прав")
+        return
+    
     await update.message.reply_text("Перевод отменен.")
     return ConversationHandler.END
 
@@ -129,6 +142,9 @@ async def quick_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Перевод на русский без определения языка"""
     user_text = update.message.text
     user_id = update.effective_user.id
+
+    if not is_user_allowed(user_id):
+        return
     
     # Пропуска команд
     if user_text.startswith('/'):
@@ -173,8 +189,6 @@ async def handle_quick_button(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     
-    # Здесь можно добавить логику быстрого перевода на другие языки
-    # Для простоты пока просто покажем сообщение
     await query.edit_message_text(
         "Для перевода на другие языки используйте команду /translate"
     )
@@ -182,6 +196,12 @@ async def handle_quick_button(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def show_languages_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Список языков"""
+    user_id = update.effective_user.id
+
+    if not is_user_allowed(user_id):
+        await update.message.reply_text("У вас недостаточно прав")
+        return
+    
     languages = translator.get_languages()
     
     languages_text = "Поддерживаемые языки:\n\n"
@@ -194,6 +214,10 @@ async def show_languages_command(update: Update, context: ContextTypes.DEFAULT_T
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Статус лимита для пользователя"""
     user_id = update.effective_user.id
+
+    if not is_user_allowed(user_id):
+        await update.message.reply_text("У вас недостаточно прав")
+        return
     
     # Получаем информацию об использовании
     usage = translator.get_user_usage(user_id)
@@ -207,22 +231,3 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     await update.message.reply_text(status_text)
-
-
-async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сброс счетчика для тестов"""
-    user_id = update.effective_user.id
-    
-    # Сбрасываем счетчик
-    success = translator.reset_user(user_id)
-    
-    if success:
-        await update.message.reply_text(
-            "Ваш счетчик переводов сброшен.\n"
-            "Теперь можно снова использовать переводы."
-        )
-    else:
-        await update.message.reply_text(
-            "У вас еще не было переводов сегодня.\n"
-            "Счетчик уже на нуле."
-        )
