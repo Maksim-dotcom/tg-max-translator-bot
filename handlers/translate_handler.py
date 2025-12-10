@@ -115,7 +115,7 @@ async def process_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(response)
     
-    # Завершаем состояния
+    # Завершаение состояния
     return ConversationHandler.END
 
 
@@ -130,7 +130,7 @@ async def quick_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
     user_id = update.effective_user.id
     
-    # Пропуска команд
+    # Пропуск команд
     if user_text.startswith('/'):
         return
     
@@ -173,8 +173,6 @@ async def handle_quick_button(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     
-    # Здесь можно добавить логику быстрого перевода на другие языки
-    # Для простоты пока просто покажем сообщение
     await query.edit_message_text(
         "Для перевода на другие языки используйте команду /translate"
     )
@@ -195,7 +193,7 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Статус лимита для пользователя"""
     user_id = update.effective_user.id
     
-    # Получаем информацию об использовании
+    # Получение информации об использовании
     usage = translator.get_user_usage(user_id)
     
     status_text = (
@@ -213,7 +211,7 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сброс счетчика для тестов"""
     user_id = update.effective_user.id
     
-    # Сбрасываем счетчик
+    # Сброс счетчика
     success = translator.reset_user(user_id)
     
     if success:
