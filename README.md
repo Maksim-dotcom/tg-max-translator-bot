@@ -49,11 +49,37 @@ YANDEX_API_KEY=ваш_api_ключ
 YANDEX_FOLDER_ID=ваш_folder_id
 ADMIN_IDS=id_админов_через_запятую_без_пробелов
 
-### 3. Установка зависимостей
-pip install -r requirements.txt
+### 4. Деплой на Yandex Cloud Functions
+```
+powrshell
 
-### 4. Запуск
-python bot.py
+#Очищение временной папки
+$tempDir = "temp_deploy_exact"
+Remove-Item $tempDir -Recurse -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+
+# 2. Копирование файлов
+Copy-Item "yc_function.py" "$tempDir/" -Force
+Copy-Item "requirements.txt" "$tempDir/" -Force
+
+# 3. Создание архива
+Compress-Archive -Path "$tempDir\*" -DestinationPath "deploy_exact.zip" -CompressionLevel Optimal -Force
+
+Write-Host "Архив создан" -ForegroundColor Green
+
+# 4. Деплой
+yc serverless function version create `
+  --function-name=tg-translator-bot `
+  --runtime=python311 `
+  --entrypoint=yc_function.handler `
+  --memory=256m `
+  --execution-timeout=30s `
+  --source-path="./deploy_exact.zip" `
+  --environment="BOT_TOKEN=$env:BOT_TOKEN" `
+  --environment="YANDEX_API_KEY=$env:YANDEX_API_KEY" `
+  --environment="YANDEX_FOLDER_ID=$env:YANDEX_FOLDER_ID" `
+  --environment="ADMIN_IDS=$env:ADMIN_IDS"
+  ```
 
 ### Ключевые особенности
 
