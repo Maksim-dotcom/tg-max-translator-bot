@@ -4,6 +4,7 @@ import sys
 import logging
 import requests
 from datetime import datetime, date
+from collections import defaultdict
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -13,10 +14,18 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "").strip()
 YANDEX_API_KEY = os.environ.get("YANDEX_API_KEY", "").strip()
 YANDEX_FOLDER_ID = os.environ.get("YANDEX_FOLDER_ID", "").strip()
-ADMIN_IDS = [int(id.strip()) for id in os.environ.get("ADMIN_IDS", "723192577,442610272").split(",") if id.strip()]
+ADMIN_IDS = [int(id.strip()) for id in os.environ["ADMIN_IDS"].split(",") if id.strip()]
 
-print(f" Токен бота получен")
+print(f"✅ Токен бота получен")
 logger.info(f"Admin IDs: {ADMIN_IDS}")
+
+# Состояния для диалога
+WAITING_FOR_LANGUAGE = 1
+WAITING_FOR_TEXT = 2
+
+# Хранение состояний пользователей
+user_states = defaultdict(dict)
+
 
 USERS_FILE_PATH = "/tmp/users.json"
 
@@ -42,6 +51,7 @@ def save_users(users):
     """Сохранение списка пользователей в JSON"""
     with open(USERS_FILE_PATH, 'w', encoding='utf-8') as f:
         json.dump(users, f, indent=2, ensure_ascii=False)
+
 
 class SimpleTranslator:
     """Переводчик"""
@@ -169,6 +179,7 @@ class SimpleTranslator:
 
 translator = SimpleTranslator()
 
+
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
@@ -204,7 +215,8 @@ def remove_user(user_id):
 def get_all_users():
     return load_users()
 
-def send_telegram_message(chat_id, text, parse_mode="HTML"):
+
+def send_telegram_message(chat_id, text, parse_mode="HTML", reply_markup=None):
     if not BOT_TOKEN:
         return None
     
@@ -215,12 +227,74 @@ def send_telegram_message(chat_id, text, parse_mode="HTML"):
         "parse_mode": parse_mode
     }
     
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    
     try:
         response = requests.post(url, json=payload, timeout=10)
         return response.json()
     except Exception as e:
         print(f"Telegram API error: {e}")
         return None
+
+def send_typing_action(chat_id):
+    if not BOT_TOKEN:
+        return None
+    
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction"
+    payload = {
+        "chat_id": chat_id,
+        "action": "typing"
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        return response.json()
+    except Exception as e:
+        print(f"Telegram API error (typing): {e}")
+        return None
+
+def edit_message(chat_id, message_id, text, parse_mode="HTML", reply_markup=None):
+    if not BOT_TOKEN:
+        return None
+    
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+    payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "text": text,
+        "parse_mode": parse_mode
+    }
+    
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        return response.json()
+    except Exception as e:
+        print(f"Telegram API error (edit): {e}")
+        return None
+
+def answer_callback_query(callback_query_id, text=""):
+    if not BOT_TOKEN:
+        return None
+    
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
+    payload = {
+        "callback_query_id": callback_query_id
+    }
+    
+    if text:
+        payload["text"] = text
+    
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        return response.json()
+    except Exception as e:
+        print(f"Telegram API error (callback): {e}")
+        return None
+
 
 def handle_start(chat_id, user_id, user_name=""):
     if not is_user_allowed(user_id):
@@ -229,12 +303,12 @@ def handle_start(chat_id, user_id, user_name=""):
     welcome_text = f"""
     Привет!
     
-    Я  бот-переводчик Максимус
+    Я — бот-переводчик Максимус
     
     Я умею:
-     Переводить текст на разные языки
-     Определять язык исходного текста
-     Сохранять настройки перевода
+    • Переводить текст на разные языки
+    • Определять язык исходного текста
+    • Сохранять настройки перевода
     
     Команды:
     /start - Запустить бота
@@ -288,61 +362,116 @@ def handle_translate_command(chat_id, user_id, user_name=""):
     if not can_translate:
         return f"Превышен дневной лимит: {error}\nИспользуйте /status для проверки."
     
+
+    user_states[user_id]["state"] = WAITING_FOR_LANGUAGE
+    
     languages = translator.get_languages()
     
-    languages_text = "Выберите язык для перевода:\n\n"
-    
+ 
+    keyboard = []
     popular_languages = ["ru", "en", "es", "fr", "de", "it"]
+    
     for lang_code in popular_languages:
         if lang_code in languages:
             lang_name = languages[lang_code]
-            languages_text += f"{lang_name} - используйте команду: /lang_{lang_code}\n"
+            keyboard.append([{
+                "text": lang_name,
+                "callback_data": f"lang_{lang_code}"
+            }])
     
-    languages_text += "\nДля отмены: /cancel"
+    keyboard.append([{"text": "Отмена", "callback_data": "cancel"}])
     
-    return languages_text
+    reply_markup = {
+        "inline_keyboard": keyboard
+    }
+    
+ 
+    send_telegram_message(
+        chat_id, 
+        "Выберите язык для перевода:",
+        reply_markup=json.dumps(reply_markup)
+    )
+    
+    return None 
 
-def handle_language_selection(chat_id, user_id, lang_code):
+def handle_language_selection(chat_id, user_id, lang_code, message_id=None):
     if not is_user_allowed(user_id):
-        return "У вас недостаточно прав"
+        answer_callback_query(chat_id, "У вас недостаточно прав")
+        return None
     
     languages = translator.get_languages()
     lang_name = languages.get(lang_code, lang_code)
     
     print(f"Выбран язык: {lang_code} ({lang_name})")
     
-    return f"Выбран язык: {lang_name}\n\nТеперь введите текст для перевода:\n\nДля отмены: /cancel"
-
-def handle_text_translation(chat_id, user_id, text, target_lang="ru"):
-    if not is_user_allowed(user_id):
-        return None
+    user_states[user_id]["target_lang"] = lang_code
+    user_states[user_id]["lang_name"] = lang_name
+    user_states[user_id]["state"] = WAITING_FOR_TEXT
     
-    print(f"Перевод текста: '{text[:50]}...' на {target_lang}")
+    answer_callback_query(chat_id, f"Выбран язык: {lang_name}")
     
-    can_translate, error = translator.can_user_translate(user_id)
-    if not can_translate:
-        return f"Превышен дневной лимит: {error}"
-    
-    translated = translator.translate(text, target_lang=target_lang, user_id=user_id)
-    
-    if translated:
-        languages = translator.get_languages()
-        lang_name = languages.get(target_lang, target_lang)
-        
-        response = (
-            f"Перевод на {lang_name}:\n\n"
-            f"{translated}\n\n"
-            f"Для нового перевода: /translate"
+    if message_id:
+        edit_message(
+            chat_id, 
+            message_id,
+            f"Выбран язык: {lang_name}\n\nТеперь введите текст для перевода:"
         )
-        return response
     else:
-        return "Не удалось перевести текст.\nПопробуйте еще раз: /translate"
+        send_telegram_message(
+            chat_id,
+            f"Выбран язык: {lang_name}\n\nТеперь введите текст для перевода:"
+        )
+    
+    return None
+
+def handle_text_translation(chat_id, user_id, text):
+    if not is_user_allowed(user_id):
+        return "У вас недостаточно прав"
+    
+    state = user_states.get(user_id, {}).get("state")
+    
+    if state == WAITING_FOR_TEXT:
+        target_lang = user_states[user_id].get("target_lang", "ru")
+        lang_name = user_states[user_id].get("lang_name", "Русский")
+        
+        print(f"Перевод текста: '{text[:50]}...' на {target_lang}")
+        
+        # Типо печатает
+        send_typing_action(chat_id)
+        
+        can_translate, error = translator.can_user_translate(user_id)
+        if not can_translate:
+            # Сброс состояния
+            user_states[user_id] = {}
+            return f"Превышен дневной лимит: {error}"
+        
+        translated = translator.translate(text, target_lang=target_lang, user_id=user_id)
+        
+        user_states[user_id] = {}
+        
+        if translated:
+            response = (
+                f"Перевод на {lang_name}:\n\n"
+                f"{translated}\n\n"
+                f"Для нового перевода: /translate"
+            )
+            return response
+        else:
+            return "Не удалось перевести текст.\nПопробуйте еще раз: /translate"
+    else:
+        # игнор
+        return None
 
 def handle_quick_translate(chat_id, user_id, text):
     if not is_user_allowed(user_id):
         return None
     
+    if text.startswith('/'):
+        return None
+    
     print(f"Быстрый перевод: '{text[:50]}...'")
+    
+    send_typing_action(chat_id)
     
     can_translate, error = translator.can_user_translate(user_id)
     if not can_translate:
@@ -351,15 +480,48 @@ def handle_quick_translate(chat_id, user_id, text):
     translated = translator.translate(text, target_lang="ru", user_id=user_id)
     
     if translated:
+        keyboard = [
+            [{
+                "text": "На английский", 
+                "callback_data": "quick_en"
+            }, {
+                "text": "На испанский", 
+                "callback_data": "quick_es"
+            }]
+        ]
+        
+        reply_markup = {
+            "inline_keyboard": keyboard
+        }
+        
         response = (
             f"Перевод на русский:\n\n"
             f"{translated}\n\n"
             f"Исходный текст:\n"
             f"{text}"
         )
-        return response
+        
+        send_telegram_message(
+            chat_id, 
+            response,
+            reply_markup=json.dumps(reply_markup)
+        )
+        
+        return None 
     else:
         return "Не удалось перевести текст. Попробуйте команду /translate"
+
+def handle_quick_button(chat_id, user_id, callback_data, message_id=None):
+    answer_callback_query(callback_data, "Для перевода на другие языки используйте команду /translate")
+    
+    if message_id:
+        edit_message(
+            chat_id, 
+            message_id,
+            "Для перевода на другие языки используйте команду /translate"
+        )
+    
+    return None
 
 def handle_languages_command(chat_id, user_id):
     if not is_user_allowed(user_id):
@@ -393,6 +555,10 @@ def handle_status_command(chat_id, user_id):
 def handle_cancel(chat_id, user_id):
     if not is_user_allowed(user_id):
         return "У вас недостаточно прав"
+    
+    # Сброс состояния
+    if user_id in user_states:
+        user_states[user_id] = {}
     
     return "Перевод отменен."
 
@@ -460,6 +626,41 @@ def handle_unknown_command(chat_id, user_id):
     
     return "Неизвестная команда.\nИспользуй /help для просмотра доступных команд"
 
+def handle_callback_query(update):
+    query = update.get("callback_query", {})
+    if not query:
+        return None
+    
+    callback_query_id = query.get("id")
+    data = query.get("data", "")
+    user_id = query.get("from", {}).get("id")
+    chat_id = query.get("message", {}).get("chat", {}).get("id")
+    message_id = query.get("message", {}).get("message_id")
+    
+    print(f"Callback query: data='{data}', user_id={user_id}")
+    
+    # Ответ
+    answer_callback_query(callback_query_id)
+    
+    if data == "cancel":
+        # Сброс состояния
+        if user_id in user_states:
+            user_states[user_id] = {}
+        
+        edit_message(chat_id, message_id, "Перевод отменен")
+        return None
+    
+    elif data.startswith("lang_"):
+        lang_code = data.replace("lang_", "")
+        handle_language_selection(chat_id, user_id, lang_code, message_id)
+        return None
+    
+    elif data.startswith("quick_"):
+        handle_quick_button(chat_id, user_id, callback_query_id, message_id)
+        return None
+    
+    return None
+
 def handler(event, context):
     try:
         logger.info("Handler started")
@@ -476,7 +677,7 @@ def handler(event, context):
                         update = body
                 else:
                     update = body
-            elif "update_id" in event or "message" in event:
+            elif "update_id" in event or "message" in event or "callback_query" in event:
                 update = event
         
         if update is None:
@@ -497,6 +698,10 @@ def handler(event, context):
             except:
                 pass
         
+        if "callback_query" in update:
+            handle_callback_query(update)
+            return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
+        
         if not isinstance(update, dict) or "message" not in update:
             return {"statusCode": 200, "body": json.dumps({"status": "ok", "message": "No message"})}
         
@@ -506,12 +711,20 @@ def handler(event, context):
         user_name = message.get("from", {}).get("first_name", "")
         text = message.get("text", "").strip()
         
-        print(f"Processing: user_id={user_id}, text='{text}'")
+        print(f"Processing: user_id={user_id}, text='{text}', state={user_states.get(user_id, {}).get('state')}")
         
         if not chat_id:
             return {"statusCode": 400, "body": json.dumps({"error": "No chat_id"})}
         
         response_text = None
+        
+        # Проверка состояния
+        state = user_states.get(user_id, {}).get("state")
+        if state == WAITING_FOR_TEXT and text and not text.startswith('/'):
+            response_text = handle_text_translation(chat_id, user_id, text)
+            if response_text:
+                send_telegram_message(chat_id, response_text)
+            return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
         
         if text == "/start":
             response_text = handle_start(chat_id, user_id, user_name)
@@ -520,11 +733,8 @@ def handler(event, context):
             response_text = handle_help(chat_id, user_id)
         
         elif text == "/translate":
-            response_text = handle_translate_command(chat_id, user_id, user_name)
-        
-        elif text.startswith("/lang_"):
-            lang_code = text.replace("/lang_", "")
-            response_text = handle_language_selection(chat_id, user_id, lang_code)
+            handle_translate_command(chat_id, user_id, user_name)
+            return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
         
         elif text == "/languages":
             response_text = handle_languages_command(chat_id, user_id)
@@ -534,6 +744,9 @@ def handler(event, context):
         
         elif text == "/cancel":
             response_text = handle_cancel(chat_id, user_id)
+            # Сбрасос состояния
+            if user_id in user_states:
+                user_states[user_id] = {}
         
         elif text.startswith("/adduser"):
             args = text.split()[1:] if len(text.split()) > 1 else []
@@ -550,7 +763,10 @@ def handler(event, context):
             response_text = handle_unknown_command(chat_id, user_id)
         
         else:
-            response_text = handle_quick_translate(chat_id, user_id, text)
+            if state != WAITING_FOR_TEXT:
+                result = handle_quick_translate(chat_id, user_id, text)
+                if result:
+                    response_text = result
         
         if response_text is None:
             return {"statusCode": 200, "body": json.dumps({"status": "ok"})}
