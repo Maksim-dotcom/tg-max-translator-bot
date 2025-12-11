@@ -41,13 +41,12 @@ Telegram-бот для перевода текста с использовани
 ### 2. Настройка переменных окружения
 
 Создать файл `.env` в корневой директории проекта:
-
+```
 BOT_TOKEN=ваш_токен_бота
-
-Yandex Translate API
-YANDEX_API_KEY=ваш_api_ключ
+YANDEX_API_KEY=ваш_api_ключ_сервисного_аккаунта
 YANDEX_FOLDER_ID=ваш_folder_id
 ADMIN_IDS=id_админов_через_запятую_без_пробелов
+```
 
 ### 4. Деплой на Yandex Cloud Functions
 ```
