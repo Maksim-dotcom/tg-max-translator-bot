@@ -38,11 +38,11 @@ Telegram-бот для перевода текста с использовани
 
 Создать файл `.env` в корневой директории проекта:
 
+```
 BOT_TOKEN=ваш_токен_бота
-
-Yandex Translate API
-YANDEX_API_KEY=ваш_api_ключ
+YANDEX_API_KEY=ваш_api_ключ_сервисного_аккаунта
 YANDEX_FOLDER_ID=ваш_folder_id
+```
 
 ### 3. Установка зависимостей
 pip install -r requirements.txt
